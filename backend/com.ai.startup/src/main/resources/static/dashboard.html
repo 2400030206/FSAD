@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title>Dashboard</title>
+<link rel="stylesheet" href="style.css">
+</head>
+
+<body>
+
+<h2>Upload PDF</h2>
+
+<p>Logged in as: <span id="userEmail"></span></p>
+<button onclick="logout()">Logout</button>
+
+<input type="file" id="pdfFile" accept="application/pdf">
+
+<h3>Language</h3>
+<select id="language">
+<option value="english">English</option>
+<option value="telugu">Telugu + English</option>
+<option value="hindi">Hindi + English</option>
+</select>
+
+<h3>Explanation Level</h3>
+<select id="level">
+<option value="simple">Very Simple</option>
+<option value="exam">Exam Level</option>
+<option value="advanced">Advanced</option>
+</select>
+
+<button onclick="uploadPDF()">Generate Explanation</button>
+
+<h3>Output Modules</h3>
+<label><input type="checkbox" class="outputOption" value="summary" checked> Summary</label><br>
+<label><input type="checkbox" class="outputOption" value="highlights"> Important Line Highlight</label><br>
+<label><input type="checkbox" class="outputOption" value="quiz" checked> Quiz</label><br>
+<label><input type="checkbox" class="outputOption" value="pointwise"> Point-wise Explanation</label><br>
+<label><input type="checkbox" class="outputOption" value="answer_explanation"> Answer Explanation</label><br>
+<label><input type="checkbox" class="outputOption" value="revision"> 5-Minute Revision</label><br>
+<label><input type="checkbox" class="outputOption" value="chapter_split"> Chapter / Section Split</label><br>
+<label><input type="checkbox" class="outputOption" value="voice_script"> Voice Read-Out Script</label><br>
+<label><input type="checkbox" class="outputOption" value="video"> AI Video Script</label><br>
+
+<hr>
+
+<h3>Result</h3>
+<pre id="result"></pre>
+
+<h3>Questions</h3>
+<ol id="questions"></ol>
+
+<hr>
+
+<button onclick="revision()">5-Minute Revision</button>
+
+<button onclick="downloadSummary()">Download Summary</button>
+
+<button onclick="startExam()">Start Exam</button>
+
+<script>
+
+const currentUser=localStorage.getItem("ai_user");
+if(!currentUser){
+window.location="index.html";
+}
+document.getElementById("userEmail").innerText=currentUser || "";
+
+function uploadPDF(){
+
+let formData=new FormData();
+
+const fileInput=document.getElementById("pdfFile");
+if(!fileInput.files || !fileInput.files[0]){
+alert("Please select a PDF file");
+return;
+}
+
+const file=fileInput.files[0];
+if(file.type && file.type !== "application/pdf"){
+alert("Please select a valid PDF file");
+return;
+}
+
+formData.append("file",file);
+formData.append("level",document.getElementById("level").value);
+formData.append("language",document.getElementById("language").value);
+
+const outputs=[...document.querySelectorAll(".outputOption:checked")]
+.map(el=>el.value)
+.join(",");
+formData.append("outputs",outputs);
+
+fetch("/api/pdf/upload",{
+method:"POST",
+body:formData
+})
+.then(async res=>{
+const text=await res.text();
+if(!res.ok) throw new Error(text || "Upload failed");
+return text;
+})
+.then(data=>{
+document.getElementById("result").innerText=data;
+
+const selectedOutputs=[...document.querySelectorAll(".outputOption:checked")]
+.map(el=>el.value);
+const wantsQuiz=selectedOutputs.includes("quiz") || selectedOutputs.includes("answer_explanation");
+const container=document.getElementById("questions");
+container.innerHTML="";
+
+if(wantsQuiz){
+fetch("/api/quiz/last")
+.then(res=>res.json())
+.then(list=>{
+list.forEach(q=>{
+const li=document.createElement("li");
+li.innerText=q.question || "";
+container.appendChild(li);
+});
+});
+}
+})
+.catch(err=>{
+alert(err.message);
+});
+}
+
+function revision(){
+
+const text=document.getElementById("result").innerText;
+if(!text){
+alert("Generate explanation first");
+return;
+}
+
+fetch("/api/learning/revision",{
+method:"POST",
+headers:{"Content-Type":"text/plain"},
+body:text
+})
+.then(async res=>{
+const data=await res.text();
+if(!res.ok) throw new Error(data || "Revision failed");
+return data;
+})
+.then(data=>{
+document.getElementById("result").innerText=data;
+})
+.catch(err=>{
+alert(err.message);
+});
+}
+
+function downloadSummary(){
+
+window.location="/api/learning/download";
+
+}
+
+function startExam(){
+
+window.location="exam.html";
+
+}
+
+function logout(){
+localStorage.removeItem("ai_user");
+localStorage.removeItem("exam_attempt_id");
+window.location="index.html";
+}
+
+// Voice Read Out
+function speak(){
+
+let text=document.getElementById("result").innerText;
+
+if(!text){
+alert("Nothing to read");
+return;
+}
+
+let speech=new SpeechSynthesisUtterance(text);
+
+speech.lang="en-US";
+
+speechSynthesis.speak(speech);
+
+}
+
+</script>
+
+<button onclick="speak()">🔊 Voice Read</button>
+
+</body>
+</html>

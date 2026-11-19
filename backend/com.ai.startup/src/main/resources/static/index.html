@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title>AI Learning Login</title>
+<link rel="stylesheet" href="style.css">
+</head>
+
+<body>
+
+<h2>Login</h2>
+
+<p id="status"></p>
+
+<input id="email" placeholder="Email">
+<input id="password" type="password" placeholder="Password">
+
+<button onclick="login()">Login</button>
+
+<script>
+
+if(localStorage.getItem("ai_user")){
+window.location="dashboard.html";
+}
+
+function setStatus(msg){
+document.getElementById("status").innerText=msg;
+}
+
+function login(){
+
+setStatus("");
+
+const email=document.getElementById("email").value.trim();
+const password=document.getElementById("password").value;
+
+if(!email || !password){
+setStatus("Please enter email and password");
+return;
+}
+
+fetch("/api/auth/login",{
+method:"POST",
+headers:{'Content-Type':'application/json'},
+body:JSON.stringify({
+email:email,
+password:password
+})
+})
+.then(res=>res.text())
+.then(data=>{
+if(data.includes("success")){
+localStorage.setItem("ai_user",email);
+window.location="dashboard.html";
+return;
+}
+
+setStatus(data);
+});
+}
+
+</script>
+
+</body>
+</html>

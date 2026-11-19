@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title>Exam Mode</title>
+<link rel="stylesheet" href="style.css">
+</head>
+
+<body>
+
+<h2>Exam Mode</h2>
+
+<p>Questions:</p>
+<ol id="examQuestions"></ol>
+
+<p>Your answer:</p>
+<textarea id="answer" rows="5" cols="60" placeholder="Write answer"></textarea>
+
+<button onclick="submitExam()">Finish Exam</button>
+
+<script>
+
+let submitted=false;
+let attemptId=null;
+
+const currentUser=localStorage.getItem("ai_user");
+if(!currentUser){
+window.location="index.html";
+}
+
+function startExam(){
+fetch("/api/exam/start")
+.then(res=>res.text())
+.then(id=>{
+attemptId=id;
+localStorage.setItem("exam_attempt_id",id);
+});
+}
+
+startExam();
+
+function loadQuestions(){
+
+fetch("/api/quiz/last")
+.then(res=>res.json())
+.then(list=>{
+if(!list || list.length===0){
+return fetch("/api/quiz/generate").then(r=>r.json());
+}
+return list;
+})
+.then(list=>{
+const container=document.getElementById("examQuestions");
+container.innerHTML="";
+list.forEach(q=>{
+const li=document.createElement("li");
+li.innerText=q.question || "";
+container.appendChild(li);
+});
+})
+.catch(()=>{
+const container=document.getElementById("examQuestions");
+container.innerHTML="<li>Failed to load questions.</li>";
+});
+}
+
+loadQuestions();
+
+function autoSubmit(){
+
+if(submitted) return;
+
+submitted=true;
+
+const id=attemptId || localStorage.getItem("exam_attempt_id");
+if(!id){
+window.location="review.html";
+return;
+}
+
+fetch("/api/exam/autoSubmit?id="+encodeURIComponent(id),{keepalive:true})
+.then(res=>res.text())
+.then(data=>{
+alert("Exam submitted because you left tab");
+window.location="review.html";
+});
+
+}
+
+document.addEventListener("visibilitychange",function(){
+
+if(document.hidden){
+autoSubmit();
+}
+
+});
+
+window.addEventListener("beforeunload",function(){
+
+autoSubmit();
+
+});
+
+function submitExam(){
+
+if(submitted) return;
+submitted=true;
+
+const id=attemptId || localStorage.getItem("exam_attempt_id");
+if(!id){
+window.location="review.html";
+return;
+}
+
+fetch("/api/exam/submit?id="+encodeURIComponent(id))
+.then(res=>res.text())
+.then(data=>{
+alert("Exam submitted");
+window.location="review.html";
+});
+}
+
+</script>
+
+</body>
+</html>
